@@ -28,7 +28,7 @@ MallocMetadata *GetFirstAvailable(size_t size) {
 
 MallocMetadata *GetTailInHist() {
     MallocMetadata *tail = nullptr;
-    int populated_index;
+    int populated_index = 0;
     for (int i = HIST_SIZE - 1; i > -1; i--) {
         if (hist[i]) {
             populated_index = i;
@@ -85,7 +85,7 @@ void removeFromHist(MallocMetadata *element) {
     prev = element->hist_prev;
     next = element->hist_next;
     if (!prev) {
-        int index = findIndexInHist(prev);
+        int index = findIndexInHist(element);
         hist[index] = next;
     } else {
         prev->hist_next = next;
@@ -231,6 +231,8 @@ MallocMetadata *advanced_malloc_cutter(size_t size, MallocMetadata *dest) {
 ////might fixed the mmap prob because we might forgot this one, but not sure,
 ////because if unmmaped its not nessacery
 void advanced_malloc_enlarge_last_block(MallocMetadata *tail, size_t size) {
+    if (!tail)
+        return;
     if (!tail->available)
         return;
     if (size < tail->alloc_size)
@@ -265,12 +267,18 @@ void *smalloc(size_t size) {
             // can enlarge the tail, if not, make new
             MallocMetadata *tail = GetTail();
             MallocMetadata *lastfreeblock = GetTailInHist();
-            if (lastfreeblock == tail) {
+            if (lastfreeblock == tail && tail) {
                 ////may solve the mmap probs, need to check if it works fine
                 advanced_malloc_enlarge_last_block(tail, size);
                 removeFromHist(tail);
-                tail->available = false;
-                ptr = tail;
+                if (tail) {
+                    tail->available = false;
+                    ptr = tail;
+                }
+                /*
+                 * tail->available = false;
+                    ptr = tail;
+                 */
             } else {
                 ptr = sbrk(size + META_SIZE);
                 if (ptr == (void *) (-1)) {
