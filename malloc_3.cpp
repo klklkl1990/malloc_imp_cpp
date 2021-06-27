@@ -1,27 +1,7 @@
-#include <unistd.h>
-#include <string.h>
-#include <sys/mman.h>
 
-#define MAX 100000000
-#define META_SIZE sizeof(MallocMetadata)
-#define BYTES_TO_SPLIT (128)
-#define MMAP_LIM 1024000 // 128kb
-#define HIST_SIZE (128)
-#define KILO_BYTE 8000 // kilo byte
+#include "malloc_3.h"
 
 
-struct MallocMetadata {
-    size_t alloc_size;
-    size_t total_size;
-    bool available;
-    MallocMetadata *next;
-    MallocMetadata *prev;
-    MallocMetadata *hist_next;
-    MallocMetadata *hist_prev;
-};
-enum MergeType {
-    NONE, TOP, BUTTOM, BOTH, TAIL
-};
 
 
 // Our global pointer to the list that contains all the data sectors
@@ -30,13 +10,7 @@ MallocMetadata *mmap_list_head = nullptr;
 MallocMetadata *hist[HIST_SIZE] = {nullptr};
 
 
-void *smalloc(size_t size);
 
-void *scalloc(size_t num, size_t size);
-
-void sfree(void *p);
-
-void *srealloc(void *oldp, size_t size);
 
 ////updated
 MallocMetadata *GetFirstAvailable(size_t size) {
