@@ -2,20 +2,18 @@
 #include "malloc_3.h"
 
 
-
-
 // Our global pointer to the list that contains all the data sectors
 MallocMetadata *regular_list_head = nullptr;
 MallocMetadata *mmap_list_head = nullptr;
 MallocMetadata *hist[HIST_SIZE] = {nullptr};
 
 
-
-
 ////updated
 MallocMetadata *GetFirstAvailable(size_t size) {
     MallocMetadata *curr = nullptr;
     int listindex = size / KILO_BYTE;
+    if (listindex == HIST_SIZE && size == MMAP_LIM)
+        listindex = HIST_SIZE - 1;
     for (int i = listindex; i < HIST_SIZE; i++) {
         curr = hist[i];
         while (curr) {
@@ -166,16 +164,19 @@ void sortList(MallocMetadata *start, int index) {
     } while (swapped);
 
 
-    MallocMetadata *temp=start;
-    MallocMetadata *head= nullptr;
+    MallocMetadata *temp = start;
+    MallocMetadata *head = nullptr;
     while (temp) {
         head = temp;
         temp = temp->hist_prev;
     }
-    hist[index]=head;
+    hist[index] = head;
 }
 
-MallocMetadata *GetLocalTailByHistIndex(int index) {
+MallocMetadata *GetLocalTailByHistIndex(int i) {
+    int index = i;
+    if (index == HIST_SIZE)
+        index = HIST_SIZE - 1;
     MallocMetadata *curr = hist[index];
     MallocMetadata *tail = nullptr;
     while (curr) {
@@ -186,7 +187,10 @@ MallocMetadata *GetLocalTailByHistIndex(int index) {
 }
 
 ////sort the list after adding
-void addToListInHist(MallocMetadata *element, int index) {
+void addToListInHist(MallocMetadata *element, int i) {
+    int index = i;
+    if (element->alloc_size == MMAP_LIM && index == HIST_SIZE)
+        index = HIST_SIZE - 1;
     if (hist[index] == nullptr) {
         hist[index] = element;
         return;
@@ -195,7 +199,7 @@ void addToListInHist(MallocMetadata *element, int index) {
     tail->hist_next = element;
     element->hist_prev = tail;
     ////is the head updated here?
-    sortList(hist[index],index);
+    sortList(hist[index], index);
 }
 
 /*
@@ -249,7 +253,7 @@ void *smalloc(size_t size) {
     void *ptr;
     MallocMetadata *exist = nullptr;
     ////if we are not mmap
-    if (size < MMAP_LIM) {
+    if (size <= MMAP_LIM) {
         exist = GetFirstAvailable(size);
         if (exist) {
             exist = advanced_malloc_cutter(size, exist);
@@ -284,7 +288,7 @@ void *smalloc(size_t size) {
     auto *new_meta = (MallocMetadata *) ptr;
     *new_meta = (MallocMetadata) {size, size + META_SIZE, false, NULL,
                                   NULL, NULL, NULL};
-    if (size >= MMAP_LIM) {
+    if (size > MMAP_LIM) {
         addToListMmap(new_meta);
     } else {
         addToList(new_meta);
@@ -329,7 +333,7 @@ void sfree(void *p) {
     MallocMetadata *curr = (MallocMetadata *) p - 1;
     if (curr->available)
         return;
-    if (curr->alloc_size < MMAP_LIM) {
+    if (curr->alloc_size <= MMAP_LIM) {
         if (curr->prev && curr->prev->available) {
             removeFromHist(curr->prev);
             removeFromHist(curr);
@@ -426,7 +430,7 @@ void *srealloc(void *oldp, size_t size) {
         return smalloc(size);
     MallocMetadata *curr = ((MallocMetadata *) oldp - 1);
     size_t requested_size = curr->alloc_size;
-    if (size < MMAP_LIM && requested_size < MMAP_LIM) {
+    if (size <= MMAP_LIM && requested_size <= MMAP_LIM) {
         if (size <= curr->alloc_size) {
             if (advanced_malloc_cutter(size, curr) == curr)
                 return oldp; //Using our current block: oldp
