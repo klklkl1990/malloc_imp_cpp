@@ -41,7 +41,6 @@ void smalloc_tests() {
     std::cout << "challenge 1 accepted!" << std::endl;
     sfree(p1);
     assert(_num_free_blocks() == 1);
-    assert(_num_allocated_blocks() == 1);
     assert(_num_free_bytes() == size1 * sizeof(int));
     //shouldn't split
     std::cout << "not yet" << std::endl;
