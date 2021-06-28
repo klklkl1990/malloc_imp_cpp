@@ -247,7 +247,7 @@ MallocMetadata *advanced_malloc_cutter(size_t size, MallocMetadata *dest) {
     }
     if (findIndexInHist(new_element) == -1) {
         //adding the remaining free block
-        addToListInHist(new_element, (new_element->total_size) / (KILO_BYTE));
+        addToListInHist(new_element, (new_element->total_size-META_SIZE) / (KILO_BYTE));
     }
     sfree(new_element + 1);
     return dest;
@@ -406,7 +406,7 @@ void sfree(void *p) {
         }
         curr->available = true;
         ////not sure about the total size ot total size-meta size
-        addToListInHist(curr, (curr->total_size) / (KILO_BYTE));
+        addToListInHist(curr, (curr->total_size-META_SIZE) / (KILO_BYTE));
         return;
     } else {
         if (curr->prev) {
