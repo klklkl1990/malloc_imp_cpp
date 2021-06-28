@@ -223,6 +223,13 @@ MallocMetadata *advanced_malloc_cutter(size_t size, MallocMetadata *dest) {
     if (new_element->next) {
         (new_element->next)->prev = new_element;
     }
+    if(findIndexInHist(dest)!=-1){
+        removeFromHist(dest); //removing the block we are using, it is no longer free
+    }
+    if(findIndexInHist(new_element)==-1){
+        //adding the remaining free block
+        addToListInHist(new_element, (new_element->total_size) / (KILO_BYTE));
+    }
     sfree(new_element + 1);
     return dest;
 }
