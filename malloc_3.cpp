@@ -98,7 +98,7 @@ void removeFromHist(MallocMetadata *element) {
     return;
 }
 
-/*
+
 MallocMetadata *GetFirstAvailableMmap(size_t size) {
     MallocMetadata *curr = mmap_list_head;
     while (curr) {
@@ -109,7 +109,7 @@ MallocMetadata *GetFirstAvailableMmap(size_t size) {
     }
     return nullptr;
 }
- */
+
 
 MallocMetadata *GetTailMmap() {
     MallocMetadata *curr = mmap_list_head;
@@ -227,6 +227,23 @@ MallocMetadata *advanced_malloc_cutter(size_t size, MallocMetadata *dest) {
     return dest;
 }
 
+
+//return true if enlarged and if true the tail is  enlarged
+bool enlarge_last_block(MallocMetadata *tail, size_t size) {
+    if (!tail->available)
+        return false;
+    if (size < tail->alloc_size)
+        return false;
+    size_t add_space = size - tail->alloc_size;
+    void *ptr = sbrk(add_space);
+    if (ptr == (void *) (-1)) {
+        return false;
+    }
+    tail->alloc_size += add_space;
+    tail->total_size += add_space;
+    return true;
+}
+
 //return true if enlarged and if true the tail is  enlarged
 ////might fixed the mmap prob because we might forgot this one, but not sure,
 ////because if unmmaped its not nessacery
@@ -248,7 +265,7 @@ void advanced_malloc_enlarge_last_block(MallocMetadata *tail, size_t size) {
     return;
 }
 
-void *smalloc(size_t size) {
+/*void *smalloc(size_t size) {
     if (size == 0 || size > MAX) {
         return NULL;
     }
@@ -275,10 +292,6 @@ void *smalloc(size_t size) {
                     tail->available = false;
                     ptr = tail;
                 }
-                /*
-                 * tail->available = false;
-                    ptr = tail;
-                 */
             } else {
                 ptr = sbrk(size + META_SIZE);
                 if (ptr == (void *) (-1)) {
@@ -302,6 +315,72 @@ void *smalloc(size_t size) {
         addToList(new_meta);
     }
     ptr = new_meta;
+    ptr = (MallocMetadata *) ptr + 1;
+    return ptr;
+}*/
+
+void *smalloc(size_t size) {
+    if (size == 0 || size > MAX) {
+        return NULL;
+    }
+    void *ptr;
+    MallocMetadata *exist;
+    if (size > MMAP_LIM) {
+        exist = GetFirstAvailableMmap(size);
+    } else {
+        exist = GetFirstAvailable(size);
+    }
+    if (exist) {
+        exist = advanced_malloc_cutter(size, exist);
+        exist->available = false;
+        if (size <= MMAP_LIM) {
+            removeFromHist(exist);
+        }
+        ptr = exist;
+    } else { //Didn't find any free block with size bytes, first check if we
+        // can enlarge the tail, if not, make new
+        MallocMetadata *tail, *lastfreeblock = nullptr;
+        if (size > MMAP_LIM) {
+            tail = GetTailMmap();
+        } else {
+            tail = GetTail();
+            lastfreeblock = GetTailInHist();
+        }
+        bool tail_avail_check = false;
+        if (tail) {
+            //not sure about this
+            if (size <= MMAP_LIM && lastfreeblock == tail && tail) {
+                tail_avail_check = enlarge_last_block(tail, size);
+            } else {//mmap case
+                tail_avail_check = enlarge_last_block(tail, size);
+            }
+        }
+        if (tail_avail_check) {
+            tail->available = false;
+            if (size <= MMAP_LIM) {
+                removeFromHist(exist);
+            }
+            ptr = tail;
+        } else {// Creating new block
+            if (size > MMAP_LIM) {
+                ptr = mmap(NULL, size + META_SIZE, PROT_READ | PROT_WRITE,
+                           MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+            } else {
+                ptr = sbrk(size + META_SIZE);
+            }
+            if (ptr == (void *) (-1)) {
+                return NULL;
+            }
+            auto *new_meta = (MallocMetadata *) ptr;
+            *new_meta = (MallocMetadata) {size, size + META_SIZE, false, NULL, NULL};
+            if (size > MMAP_LIM) {
+                addToListMmap(new_meta);
+            } else {
+                addToList(new_meta);
+            }
+            ptr = new_meta;
+        }
+    }
     ptr = (MallocMetadata *) ptr + 1;
     return ptr;
 }
