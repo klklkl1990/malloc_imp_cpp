@@ -134,12 +134,21 @@ void addToListMmap(MallocMetadata *element) {
 void nodeSwap(MallocMetadata *left, MallocMetadata *right) {
     MallocMetadata *a = left->hist_prev;
     MallocMetadata *b = right->hist_next;
-    a->hist_next = right;
-    right->hist_prev = a;
-    left->hist_prev = right;
-    left->hist_next = b;
-    right->hist_next = left;
-    b->hist_prev = left;
+    if(left && right && !a && !b){ // the list has only two nodes: left and right
+        MallocMetadata *temp=left;
+        left->hist_prev=right;
+        left->hist_next=b;//which is null;
+        right->hist_prev= a; // which is null;
+        right->hist_next=temp;
+    }
+    else {
+        a->hist_next = right;
+        right->hist_prev = a;
+        left->hist_prev = right;
+        left->hist_next = b;
+        right->hist_next = left;
+        b->hist_prev = left;
+    }
 }
 
 void sortList(MallocMetadata *start, int index) {
@@ -152,7 +161,7 @@ void sortList(MallocMetadata *start, int index) {
     do {
         swapped = 0;
         ptr1 = start;
-        while (ptr1->hist_next != lptr) {
+        while (ptr1 && ptr1->hist_next != lptr) {
             //asuming this is sorted by total_size not aloc_size
             if ((ptr1->alloc_size) > ((ptr1->hist_next)->alloc_size)) {
                 nodeSwap(ptr1, ptr1->hist_next);
