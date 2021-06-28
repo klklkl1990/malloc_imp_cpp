@@ -10,7 +10,17 @@ MallocMetadata *hist[HIST_SIZE] = {nullptr};
 
 ////updated
 MallocMetadata *GetFirstAvailable(size_t size) {
-    MallocMetadata *curr = nullptr;
+    MallocMetadata *curr = regular_list_head;
+    while (curr) {
+        if (curr->alloc_size >= size && curr->available) {
+            return curr;
+        }
+        curr = curr->next;
+    }
+    return nullptr;
+
+
+    /*MallocMetadata *curr = nullptr;
     int listindex = size / KILO_BYTE;
     if (listindex == HIST_SIZE && size == MMAP_LIM)
         listindex = HIST_SIZE - 1;
@@ -23,7 +33,8 @@ MallocMetadata *GetFirstAvailable(size_t size) {
             curr = curr->hist_next;
         }
     }
-    return curr;
+    return curr;*/
+
 }
 
 MallocMetadata *GetTailInHist() {
@@ -134,14 +145,13 @@ void addToListMmap(MallocMetadata *element) {
 void nodeSwap(MallocMetadata *left, MallocMetadata *right) {
     MallocMetadata *a = left->hist_prev;
     MallocMetadata *b = right->hist_next;
-    if(left && right && !a && !b){ // the list has only two nodes: left and right
-        MallocMetadata *temp=left;
-        left->hist_prev=right;
-        left->hist_next=b;//which is null;
-        right->hist_prev= a; // which is null;
-        right->hist_next=temp;
-    }
-    else {
+    if (left && right && !a && !b) { // the list has only two nodes: left and right
+        MallocMetadata *temp = left;
+        left->hist_prev = right;
+        left->hist_next = b;//which is null;
+        right->hist_prev = a; // which is null;
+        right->hist_next = temp;
+    } else {
         a->hist_next = right;
         right->hist_prev = a;
         left->hist_prev = right;
@@ -232,10 +242,10 @@ MallocMetadata *advanced_malloc_cutter(size_t size, MallocMetadata *dest) {
     if (new_element->next) {
         (new_element->next)->prev = new_element;
     }
-    if(findIndexInHist(dest)!=-1){
+    if (findIndexInHist(dest) != -1) {
         removeFromHist(dest); //removing the block we are using, it is no longer free
     }
-    if(findIndexInHist(new_element)==-1){
+    if (findIndexInHist(new_element) == -1) {
         //adding the remaining free block
         addToListInHist(new_element, (new_element->total_size) / (KILO_BYTE));
     }
@@ -281,59 +291,6 @@ void advanced_malloc_enlarge_last_block(MallocMetadata *tail, size_t size) {
     return;
 }
 
-/*void *smalloc(size_t size) {
-    if (size == 0 || size > MAX) {
-        return NULL;
-    }
-    void *ptr;
-    MallocMetadata *exist = nullptr;
-    ////if we are not mmap
-    if (size <= MMAP_LIM) {
-        exist = GetFirstAvailable(size);
-        if (exist) {
-            exist = advanced_malloc_cutter(size, exist);
-            exist->available = false;
-            removeFromHist(exist);
-            ptr = exist;
-        } else {
-            //Didn't find any free block with size bytes, first check if we
-            // can enlarge the tail, if not, make new
-            MallocMetadata *tail = GetTail();
-            MallocMetadata *lastfreeblock = GetTailInHist();
-            if (lastfreeblock == tail && tail) {
-                ////may solve the mmap probs, need to check if it works fine
-                advanced_malloc_enlarge_last_block(tail, size);
-                removeFromHist(tail);
-                if (tail) {
-                    tail->available = false;
-                    ptr = tail;
-                }
-            } else {
-                ptr = sbrk(size + META_SIZE);
-                if (ptr == (void *) (-1)) {
-                    return NULL;
-                }
-            }
-        }
-    } else { // Creating new block
-        ptr = mmap(NULL, size + META_SIZE, PROT_READ | PROT_WRITE,
-                   MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-        if (ptr == (void *) (-1)) {
-            return NULL;
-        }
-    }
-    auto *new_meta = (MallocMetadata *) ptr;
-    *new_meta = (MallocMetadata) {size, size + META_SIZE, false, NULL,
-                                  NULL, NULL, NULL};
-    if (size > MMAP_LIM) {
-        addToListMmap(new_meta);
-    } else {
-        addToList(new_meta);
-    }
-    ptr = new_meta;
-    ptr = (MallocMetadata *) ptr + 1;
-    return ptr;
-}*/
 
 void *smalloc(size_t size) {
     if (size == 0 || size > MAX) {
@@ -566,8 +523,7 @@ void *srealloc(void *oldp, size_t size) {
         }
         curr = ((MallocMetadata *) oldp - 1);
         if (curr != GetTail()) {
-            void *ptr = smalloc(
-                    size); // find a big block or allocate a new block
+            void *ptr = smalloc(size); // find a big block or allocate a new block
             if (!ptr)
                 return NULL;
             memcpy(ptr, oldp, requested_size);
@@ -585,7 +541,7 @@ void *srealloc(void *oldp, size_t size) {
                 return NULL;
             }
         }
-    } else {
+    } else { // Bigger than MMAP_LIM
         void *ptr = smalloc(size); // find a big block or allocate a new block
         if (!ptr)
             return NULL;
