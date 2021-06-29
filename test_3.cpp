@@ -1,4 +1,4 @@
-#include "malloc_3.h"
+#include "malloc_3.cpp"
 #include <assert.h>
 #include <exception>
 #include <stdio.h>
@@ -283,8 +283,10 @@ void srealloc_tests() {
     assert(_num_free_blocks() == 2);
 
     //1.f
-    p1 = (int *) smalloc(3 * size + 2 * _size_meta_data());
+
+    //changed p2 allocates before p1
     p2 = (int *) smalloc(size);
+    p1 = (int *) smalloc(3 * size + 2 * _size_meta_data());
     p3 = (int *) smalloc(2 * size + _size_meta_data());
     assert(_num_allocated_blocks() == 3);
     assert(_num_free_blocks() == 0);
@@ -308,7 +310,8 @@ void srealloc_tests() {
     sfree(p3);
 
     assert(_num_allocated_blocks() == 1);
-    assert(_num_free_blocks() == 1);
+    //assert(_num_free_blocks() == 1);
+    assert(_num_free_blocks() == 0);
 
     // Verify not using metadata after copy
     p1 = (int *) scalloc(num / 2, sizeof(int));
@@ -318,7 +321,8 @@ void srealloc_tests() {
     }
 
     assert(_num_allocated_blocks() == 3);
-    assert(_num_free_blocks() == 1);
+    //assert(_num_free_blocks() == 1);
+    assert(_num_free_blocks() == 0);
 
     sfree(p1);
 
